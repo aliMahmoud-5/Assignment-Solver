@@ -1,0 +1,2 @@
+for this app to work propperly you need to install some pachages:
+-pip install PyPDF2 ag2[together] autogen requests beautifulsoup4 google-search-results python-docx docx
