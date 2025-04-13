@@ -40,7 +40,7 @@ def extract_text_from_pdf(pdf_path):
     with open(pdf_path, "rb") as file:
         reader = PyPDF2.PdfReader(file)
         for page in reader.pages:
-            text += page.extract_text() or ''  # fallback in case extract_text() returns None
+            text += page.extract_text() or ''  
     return text
 
 
@@ -263,13 +263,13 @@ def DemoSolver():
     )
     
 
-    # At the end of your solver()
+
     formatter_output = groupchat_result.chat_history[-1]['content']
-    # Set filename (extract from content or use default)
+
     filename = "Generated_Assignment.docx"
     filepath = create_word_doc(formatter_output, filename)
 
-    # Return both content and file path
+
     return formatter_output, filepath
 
 

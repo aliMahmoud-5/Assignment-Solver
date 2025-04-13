@@ -233,13 +233,13 @@ def solver(course_texts,assignment_text):
         message=task,
     )
 
-    # At the end of your solver()
+
     formatter_output = groupchat_result.chat_history[-1]['content']
-    # Set filename (extract from content or use default)
+
     filename = "Generated_Assignment.docx"
     filepath = create_word_doc(formatter_output, filename)
 
-    # Return both content and file path
+
     return formatter_output, filepath
 
 
