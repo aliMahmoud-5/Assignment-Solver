@@ -9,6 +9,7 @@ from bs4 import BeautifulSoup
 from serpapi import GoogleSearch
 from docx import Document
 import os
+import shutil
 from text_to_docx import create_word_doc
 
 
@@ -46,115 +47,27 @@ def solver(course_texts,assignment_text):
         llm_config=llm_config,
         human_input_mode="NEVER",
     )
+    print("host reply")
     hreply = host.generate_reply(messages=[{"content": "start your task", "role": "user"}])
+    print(hreply['content'])
 
-
-
-
-
-
-    try:
-        # Extract JSON from LLM response using regex
-        json_match = re.search(r"\{.*\}", hreply['content'], re.DOTALL)
-
-        if json_match:
-            json_text = json_match.group(0)
-            extracted_data = json.loads(json_text)
-            print("Extracted JSON:", extracted_data)
-        else:
-            print("No JSON structure found. Full response:", hreply['content'])
-            extracted_data = {}
-
-        assignmentWebSearch = extracted_data.get("assignmentWebSearch", [])
-        courseWebSearch = extracted_data.get("courseWebSearch", [])
-
-    except json.JSONDecodeError as e:
-        print("Failed to parse JSON:", str(e))
-        print("Full response:", hreply['content'])
-        extracted_data = {}
-
-
-    all_queries = assignmentWebSearch + courseWebSearch
-
-
-
-
-    def google_search(query):
-        """Uses SERPAPI to search Google and return top result links."""
-        params = {
-            "q": query,
-            "api_key": SERPAPI_KEY,
-            "num": 2
-        }
-
-        search = GoogleSearch(params)
-        results = search.get_dict()
-
-        if "organic_results" in results:
-            return [result["link"] for result in results["organic_results"]]  # Extract URLs
-        return []
-
-    def scrape_website(url):
-        """Fetch and extract text content from a given website URL."""
-        try:
-            headers = {"User-Agent": "Mozilla/5.0"}
-            response = requests.get(url, headers=headers, timeout=10)
-            response.raise_for_status()  # Raise an error for HTTP issues
-
-            soup = BeautifulSoup(response.text, "html.parser")
-
-            # Extract main content from <p> tags
-            paragraphs = soup.find_all("p")
-            extracted_text = "\n".join(p.get_text() for p in paragraphs[:5])  # Limit to 5 paragraphs
-
-            return extracted_text if extracted_text else "No relevant content found."
-
-        except requests.exceptions.RequestException as e:
-            return f"Error fetching {url}: {str(e)}"
-
-
-    def process_queries(query_list):
-
-        """
-        this function scrape the internet for queries provied by courseWebSearch + assignmentWebSearch.
-        Args:
-          query_list : a concatenation of the provided two lists courseWebSearch and assignmentWebSearch
-
-        returns:
-          the search result preceded by the query.
-        """
-        results = {}
-        for query in query_list:
-            print(f"Searching: {query}")
-            links = google_search(query)
-            if links:
-                scraped_data = [scrape_website(link) for link in links]
-                results[query] = scraped_data
-            else:
-                results[query] = ["No relevant search results."]
-        return results
-
-
-
-    if all_queries:
-        search_results = process_queries(all_queries)
-        print("\n🔍 Web Scraping Results:")
-        for query, results in search_results.items():
-            print(f"\n🔹 Query: {query}")
-            for res in results:
-                print(f"   - {res[:300]}...")
-    else:
-        print("⚠️ No queries to process.")
-
-
-    web_scraper = LocalCommandLineCodeExecutor(
-        timeout=60,
-        work_dir="coding",
-        functions=[process_queries],
-
+    researcher = AssistantAgent(
+        name="host",
+        system_message=(
+            f"provided by {hreply}.\n\n"
+            "your task is to:\n"
+            "1. search the web to answer the quiries in the provided text.\n"
+            "2. the answer for each quiry mut be at least 1000 words.\n"
+            "3. mention nothing about the word count.\n"
+        ),
+        llm_config=llm_config,
+        human_input_mode="NEVER",
+        
     )
-    queries_result = process_queries(all_queries)
-    print(queries_result)
+    print("researcher reply")
+    queries_result = researcher.generate_reply(messages=[{"content": "search the web for the provided quiries", "role": "user"}])
+    print(queries_result['content'])
+
 
 
 
@@ -169,78 +82,81 @@ def solver(course_texts,assignment_text):
         f"- formatting requirements from {hreply}\n"
         f"- Results from web research from {queries_result}\n\n"
         "analyze and understand all your input.\n"
-        "note that all the input provided belongs to the same assignment.\n"
+        "note that all the input provided belongs to only one assignment assignment.\n"
         "DO NOT summarize, interpret, or explain the inputs.\n"
+        "DO NOT mention the word count.\n"
         "DO NOT output anything unrelated to the direct solution.\n\n"
-        "Your task is to directly answer the assignment using a structured format that mirrors the assignment's requirements.\n"
+        "Your task is to directly answer the assignment questions and demands using a structured format that mirrors the assignment's requirements.\n"
         "Ensure each answer is:\n"
+        "- at least 1000 words without mentioning the word count \n"
         "- Fully developed and clear\n"
+        "- only write the word 'Assinment' before the assignment title\n"
         "- Aligned with course terminology and learning outcomes\n"
         "- Informed by relevant insights from the provided research\n"
         "Avoid any mention of the sources or how the solution was derived.\n"
         "Proceed straight to writing the solution using formal academic language.\n"
-        f"extract and pass to the next agent the forrmating requirements and the word count found in {hreply}\n"
+        #f"extract and pass to the next agent the forrmating requirements and the word count found in {hreply}\n"
         "Be clear, concise, coherent, and logically organized for easy formatting in the next stage."
         ),
         llm_config=llm_config,
         human_input_mode="NEVER",
     )
-
-
+    print("generator reply")
+    answers = generator.generate_reply(messages=[{"content": "start your task, and never terminate before you generate the answers to the assignments according to the proper structure and requirements", "role": "user"}])
+    print(answers['content'])
 
 
     formatter = AssistantAgent(
         name="formatter",
         system_message =("You are a formatting assistant tasked with transforming raw assignment answers into a properly formatted academic document.\n\n"
         "You will receive:\n"
-        "- Assignment answers generated by the 'generator' agent\n"
-        "- Formatting instructions (e.g., font, spacing, headings, citations, word count)\n\n"
+        f"- Assignment answers found in {answers}\n"
+        f"-assignment text found in {hreply}\n"
+        f"- Formatting instructions (e.g., font, spacing, headings, citations, word count) found in {hreply}\n\n"
+        "note that all the answers provided belongs  to the same assignment"
         "Your responsibilities:\n"
-        "1. summaries the asnwers to be within the maximum required word count as defined by the assignment\n\n"
-        "2. Format the content to be written into Word document (DOCX)\n"
+        "1. Format the content to be written into Word document (DOCX)\n"
+        "2. summaries the asnwers to be within the required word count as defined in the assignment\n"
         "3. Apply all required formatting strictly\n"
         "4. Ensure coherence, grammar correctness, and academic tone\n"
         "5. Check for plagiarism and originality\n\n"
         "always start you response as follows.\n"
         "-list the formatting requirements passed to you by the pervious agent.\n"
         "-write the keyord '**Document:**' to indicate the begining of the document to be converted to Word.\n"
+        "-write 'Assignment:' followed by the assignment title"
         "Make no assumptions.\n"
+        "count the words after the keyowrd '**Document:**' if it is less than the word count required in '**Formatting Requirements:**' elaborate so the total words after '**Document:**' is within the required word count.\n"
         "Your output should be the final text, formatted and ready to be written in a word document — ready to be submitted.\n"
         ),
         llm_config=llm_config,
         human_input_mode="NEVER",
     )
 
+    print("formatter reply")
+    formatter_output = formatter.generate_reply(messages=[{"content": "generate the word document", "role": "user"}])
+    print(formatter_output['content'])
+
+    
 
 
-
-    groupchat = autogen.GroupChat(
-        agents=[generator,formatter],
-        messages=[],
-        allowed_or_disallowed_speaker_transitions={
-            generator: [formatter],
-        },
-        speaker_transitions_type="allowed",
-    )
-
-    manager = autogen.GroupChatManager(
-        groupchat=groupchat, llm_config=llm_config
-    )
-
-    task = "start your task, and never terminate before you generate the answers to the assignments according to the proper structure and requirements"
-    groupchat_result = manager.initiate_chat(
-        generator,
-        message=task,
-    )
-
-
-    formatter_output = groupchat_result.chat_history[-1]['content']
 
     filename = "Generated_Assignment.docx"
-    filepath = create_word_doc(formatter_output, filename)
+    filepath = create_word_doc(formatter_output['content'], filename)
 
+    cache = "./.cache"
+    pycache = "./__pycache__"
 
-    return formatter_output, filepath
+    if os.path.exists(cache):
+        shutil.rmtree(cache)
+    else:
+        print("File does not exist.")
+
+    if os.path.exists(pycache):
+        shutil.rmtree(pycache)
+    else:
+        print("File does not exist.")
+
+    return formatter_output['content'], filepath
 
 
 
