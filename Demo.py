@@ -1,7 +1,6 @@
 ﻿from autogen import  AssistantAgent
 import autogen
 import PyPDF2
-from docx import Document
 import os
 from text_to_docx import create_word_doc
 
