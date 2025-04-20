@@ -1,7 +1,7 @@
 import PyPDF2
 from typing import Union
 import io
-
+#function to extract text from uploaded files by streamlit
 def extract_text_from_uploaded_pdf(course_file: Union[list, 'UploadedFile']) -> str:
     """
     Extracts text from the first UploadedFile in the list.

@@ -1,12 +1,6 @@
-﻿from autogen import ConversableAgent, GroupChat, GroupChatManager, AssistantAgent
-from autogen.coding import LocalCommandLineCodeExecutor
+﻿from autogen import AssistantAgent
 import autogen
-import json
-import re
 import PyPDF2
-import requests
-from bs4 import BeautifulSoup
-from serpapi import GoogleSearch
 from docx import Document
 import os
 import shutil
@@ -27,9 +21,11 @@ llm_config = {
 SERPAPI_KEY = "3a01b6db013287fb18f155cf27c12c4db852b9a5245bb3c9e18617f5defa27e3"
 
 
-
+#this function of the Ai agents flow is to be called by the UI
 def solver(course_texts,assignment_text):
-    host = autogen.AssistantAgent(
+    #Host is the agent that takes the files extracted text
+    # analyze keypoints and topics and generate web search quiries to be passed to thr researcher
+    host = AssistantAgent(
         name="host",
         system_message=(
             f"You have been provided with extracted course text {course_texts}.\n"
@@ -51,6 +47,8 @@ def solver(course_texts,assignment_text):
     hreply = host.generate_reply(messages=[{"content": "start your task", "role": "user"}])
     print(hreply['content'])
 
+
+    #resercher is the agent that searches the web for suplimentary information about the assignment and the courses
     researcher = AssistantAgent(
         name="host",
         system_message=(
@@ -71,7 +69,7 @@ def solver(course_texts,assignment_text):
 
 
 
-
+    #provided by all the previous agents work to generate an extended version of the assignment answers
     generator = AssistantAgent(
         name="generator",
         system_message =( f"Given {queries_result}, and {hreply}."
@@ -105,7 +103,9 @@ def solver(course_texts,assignment_text):
     answers = generator.generate_reply(messages=[{"content": "start your task, and never terminate before you generate the answers to the assignments according to the proper structure and requirements", "role": "user"}])
     print(answers['content'])
 
-
+    #provided by all previous agents effort, it checkes the assignment formatting requirements
+    #and summaries the generator answers and construct the text according to the assignment requirements
+    #then this text got passed to a function that creates the Word document
     formatter = AssistantAgent(
         name="formatter",
         system_message =("You are a formatting assistant tasked with transforming raw assignment answers into a properly formatted academic document.\n\n"
@@ -139,10 +139,11 @@ def solver(course_texts,assignment_text):
     
 
 
-
+    #passing the forrmater output to the Word doc creation function
     filename = "Generated_Assignment.docx"
     filepath = create_word_doc(formatter_output['content'], filename)
 
+    #i deleted the cache files so the answers are different even the same assignmet got passed twice or more
     cache = "./.cache"
     pycache = "./__pycache__"
 
